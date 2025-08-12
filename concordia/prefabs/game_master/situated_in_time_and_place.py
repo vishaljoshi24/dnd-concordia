@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A prefab for a game master for games set in a specific location."""
+"""A prefab for game masters that simulate a physically situated time and place.
+"""
 
 from collections.abc import Mapping, Sequence
 import copy
@@ -23,19 +24,30 @@ from concordia.agents import entity_agent_with_logging
 from concordia.associative_memory import basic_associative_memory
 from concordia.components import agent as actor_components
 from concordia.components import game_master as gm_components
-from concordia.contrib.components.game_master import death as death_component_module
-from concordia.contrib.components.game_master import spaceship_system as spaceship_system_component_module
 from concordia.language_model import language_model
 from concordia.thought_chains import thought_chains as thought_chains_lib
 from concordia.typing import prefab as prefab_lib
 
+_DEFAULT_CLOCK_DESCRIPTION = (
+    'The passing of time can be conveyed using any convenient '
+    'feature of the environment, e.g. a physical clock, the angle '
+    'of the sun, extent of a candle\'s melting, phase of the moon, '
+    'agricultural season, elapsed time since an event, etc. Whenever '
+    'possible, try to track the day and year as well as the time '
+    'within the day. To determine the passing of time, try to make '
+    'reasonable inferences about the amount of time that would '
+    'most likely have elapsed between the previous event and the '
+    'latest event, taking into account the number of simulation '
+    'steps taken.'
+)
+
 
 @dataclasses.dataclass
 class GameMaster(prefab_lib.Prefab):
-  """A prefab entity implementing a game master for games set in a specific location."""
+  """Prefab implementing game masters for games set in a physical time/place."""
 
   description: str = (
-      'A general game master for games set in a specific location.'
+      'A general game master for games situated in a physical time/place.'
   )
   params: Mapping[str, Any] = dataclasses.field(
       default_factory=lambda: {
@@ -43,15 +55,21 @@ class GameMaster(prefab_lib.Prefab):
           # Provide a comma-separated list of thought chain steps to use in the
           # event resolution component.
           'extra_event_resolution_steps': '',
-          'locations': '',
+          # A description of what the clock represents, how it gets updated, and
+          # what it is used for. It will be used as a prompt for the clock
+          # component and a constant available at all times for the game master.
+          'clock_description': _DEFAULT_CLOCK_DESCRIPTION,
+          # The clock's initial setting.
+          'start_time': None,
+          # Describe locations where entities may be located at any time. This
+          # string will be used as a prompt for the location representation
+          # component and a constant available at all times for the game master.
+          'locations': None,
           'extra_components': {},
           # A mapping from component name to the index at which to insert it
           # in the component order. If not specified, the extra components
           # will be inserted at the end of the component order.
           'extra_components_index': {},
-          # If true, the actors will alternate in a round robin fashion.
-          # Otherwise, the actors will be chosen by call to the game master.
-          'acting_order': 'game_master_choice',
       }
   )
   entities: Sequence[entity_agent_with_logging.EntityAgentWithLogging] = ()
@@ -70,6 +88,13 @@ class GameMaster(prefab_lib.Prefab):
     Returns:
       An entity.
     """
+    clock_description = self.params.get(
+        'clock_description', _DEFAULT_CLOCK_DESCRIPTION)
+    assert isinstance(clock_description, str)  # For pytype.
+    start_time = self.params.get('start_time', None)
+    assert isinstance(start_time, str)  # For pytype.
+    location_descriptions = self.params.get('locations', None)
+    assert isinstance(location_descriptions, str)  # For pytype.
 
     extra_components = self.params.get('extra_components', {})
     extra_components_index = self.params.get('extra_components_index', {})
@@ -144,24 +169,58 @@ class GameMaster(prefab_lib.Prefab):
 
     locations_constant_key = 'locations_constant'
     locations_constant = actor_components.constant.Constant(
-        self.params.get('locations'), pre_act_label='Locations'
+        location_descriptions, pre_act_label='Locations'
     )
 
-    terminator_key = gm_components.terminate.DEFAULT_TERMINATE_COMPONENT_KEY
-    terminator = gm_components.terminate.Terminate()
+    clock_constant_key = 'clock_constant'
+    clock_constant = actor_components.constant.Constant(
+        clock_description, pre_act_label='Clock description'
+    )
+
+    generative_clock_key = 'generative_clock'
+    generative_clock = gm_components.world_state.GenerativeClock(
+        model=model,
+        prompt=clock_description,
+        start_time=start_time,
+        components=[
+            instructions_key,
+            clock_constant_key,
+            display_events_key,
+        ],
+        pre_act_label='\nCurrent time',
+    )
 
     locations_key = 'locations'
     entity_locations = gm_components.world_state.Locations(
         model=model,
         entity_names=player_names,
-        prompt=self.params.get('locations'),
+        prompt=location_descriptions,
         components=[
             instructions_key,
             locations_constant_key,
+            clock_constant_key,
             player_characters_key,
             relevant_memories_key,
             display_events_key,
+            generative_clock_key,
         ],
+        pre_act_label='\nCurrent locations',
+    )
+
+    world_state_key = 'world_state'
+    world_state = gm_components.world_state.WorldState(
+        model=model,
+        components=[
+            instructions_key,
+            player_characters_key,
+            locations_constant_key,
+            clock_constant_key,
+            locations_key,
+            generative_clock_key,
+            relevant_memories_key,
+            display_events_key,
+        ],
+        pre_act_label='\nCurrent state',
     )
 
     make_observation_key = (
@@ -173,8 +232,13 @@ class GameMaster(prefab_lib.Prefab):
         components=[
             instructions_key,
             player_characters_key,
+            locations_constant_key,
+            clock_constant_key,
             relevant_memories_key,
             display_events_key,
+            generative_clock_key,
+            locations_key,
+            world_state_key,
         ],
         reformat_observations_in_specified_style=(
             'The format to use when describing the '
@@ -188,30 +252,20 @@ class GameMaster(prefab_lib.Prefab):
         components=[
             instructions_key,
             player_characters_key,
+            locations_constant_key,
+            clock_constant_key,
             relevant_memories_key,
             display_events_key,
+            generative_clock_key,
+            locations_key,
+            world_state_key,
         ],
     )
     next_actor_key = gm_components.next_acting.DEFAULT_NEXT_ACTING_COMPONENT_KEY
-    acting_order = self.params.get(
-        'acting_order', 'game_master_choice'
+    next_actor = gm_components.next_acting.NextActing(
+        **next_acting_kwargs,
+        player_names=player_names,
     )
-    if acting_order == 'fixed':
-      next_actor = gm_components.next_acting.NextActingInFixedOrder(
-          sequence=player_names,
-      )
-    elif acting_order == 'game_master_choice':
-      next_actor = gm_components.next_acting.NextActing(
-          **next_acting_kwargs,
-          player_names=player_names,
-      )
-    elif acting_order == 'random':
-      next_actor = gm_components.next_acting.NextActingInRandomOrder(
-          player_names=player_names,
-      )
-    else:
-      raise ValueError(f'Unsupported acting order: {acting_order}')
-
     next_action_spec_kwargs = copy.copy(next_acting_kwargs)
     next_action_spec_key = (
         gm_components.next_acting.DEFAULT_NEXT_ACTION_SPEC_COMPONENT_KEY
@@ -221,71 +275,16 @@ class GameMaster(prefab_lib.Prefab):
         player_names=player_names,
     )
 
-    oxygen_generator_key = 'oxygen_generator'
-    oxygen_generator_system = spaceship_system_component_module.SpaceshipSystem(
-        model=model,
-        system_name='Oxygen generator',
-        system_max_health=10,
-        system_failure_probability=0.7,
-        terminator_component_key=terminator_key,
-        observation_component_key=make_observation_key,
-        warning_message=(
-            'WARNING! Oxygen generator is failing! Fix immediately by replacing'
-            ' the filter in the Main Hallway.'
-        ),
-        pre_act_label='Oxygen generator system',
-        components=[
-            instructions_key,
-            player_characters_key,
-            # relevant_memories_key,
-            # display_events_key,
-        ],
-        verbose=True,
-    )
-
-    power_generator_key = 'power_generator'
-    power_generator_system = spaceship_system_component_module.SpaceshipSystem(
-        model=model,
-        system_name='Power generator',
-        system_max_health=10,
-        system_failure_probability=0.7,
-        terminator_component_key=terminator_key,
-        observation_component_key=make_observation_key,
-        warning_message=(
-            'WARNING! Power generator is failing! Fix immediately by replacing'
-            ' the fuse in the Electrical.'
-        ),
-        pre_act_label='Power generator system',
-        components=[
-            instructions_key,
-            player_characters_key,
-        ],
-        verbose=True,
-    )
-
-    death_key = death_component_module.DEFAULT_DEATH_COMPONENT_KEY
-    death = death_component_module.Death(
-        model=model,
-        pre_act_label='Death',
-        actor_names=player_names,
-        components=[
-            instructions_key,
-            player_characters_key,
-        ],
-        memory_component_key=memory_component_key,
-        terminator_component_key=terminator_key,
-        observation_component_key=make_observation_key,
-        fixed_order_next_acting_component_key=next_actor_key,
-        verbose=True,
-    )
-
     # Define thinking steps for the event resolution component to use whenever
     # it converts putative events like action suggestions into real events in
     # the simulation.
+    account_for_agency_of_others = thought_chains_lib.AccountForAgencyOfOthers(
+        model=model, players=self.entities, verbose=False
+    )
 
     event_resolution_steps = [
-        thought_chains_lib.result_to_effect_caused_by_active_player,
-        thought_chains_lib.attempt_to_result,
+        account_for_agency_of_others,
+        thought_chains_lib.result_to_who_what_where,
     ]
     if extra_event_resolution_steps:
       for step in extra_event_resolution_steps:
@@ -295,8 +294,13 @@ class GameMaster(prefab_lib.Prefab):
     event_resolution_components = [
         instructions_key,
         player_characters_key,
+        locations_constant_key,
+        clock_constant_key,
         relevant_memories_key,
         display_events_key,
+        generative_clock_key,
+        locations_key,
+        world_state_key,
     ]
 
     event_resolution_key = (
@@ -313,16 +317,15 @@ class GameMaster(prefab_lib.Prefab):
         instructions_key: instructions,
         examples_synchronous_key: examples_synchronous,
         player_characters_key: player_characters,
+        locations_constant_key: locations_constant,
+        clock_constant_key: clock_constant,
         relevant_memories_key: relevant_memories,
         observation_component_key: observation,
         observation_to_memory_key: observation_to_memory,
         display_events_key: display_events,
-        locations_constant_key: locations_constant,
+        generative_clock_key: generative_clock,
         locations_key: entity_locations,
-        terminator_key: terminator,
-        oxygen_generator_key: oxygen_generator_system,
-        power_generator_key: power_generator_system,
-        death_key: death,
+        world_state_key: world_state,
         memory_component_key: memory_component,
         make_observation_key: make_observation,
         next_actor_key: next_actor,

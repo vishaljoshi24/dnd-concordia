@@ -15,18 +15,18 @@
 """Component helping a game master ask a questionnaire."""
 
 import collections
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 import json
 import re
 import threading
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from concordia.components.game_master import event_resolution
 from concordia.contrib.data.questionnaires import base_questionnaire
 from concordia.typing import entity as entity_lib
 from concordia.typing import entity_component
+import numpy as np
 import pandas as pd
-
 
 DefaultDict = collections.defaultdict
 
@@ -36,13 +36,14 @@ PUTATIVE_EVENT_TAG = event_resolution.PUTATIVE_EVENT_TAG
 _TERMINATE_SIGNAL = 'Yes'
 
 
-class Questionnaire(entity_component.ContextComponent):
+class OpenEndedQuestionnaire(entity_component.ContextComponent):
   """A component that asks a questionnaire to one or more actors."""
 
   def __init__(
       self,
       questionnaires: Sequence[base_questionnaire.QuestionnaireBase],
       player_names: Sequence[str],
+      embedder: Callable[[str], np.ndarray] | None = None,
       pre_act_label: str = 'Current Question',
   ):
     """Initializes the component.
@@ -51,6 +52,7 @@ class Questionnaire(entity_component.ContextComponent):
       questionnaires: A sequence of questionnaire dictionaries.
       player_names: The names of the players to which the questions are
         addressed.
+      embedder: A function that takes a string and returns an embedding.
       pre_act_label: Prefix to add to the output of the component when called in
         `pre_act`.
     """
@@ -60,6 +62,7 @@ class Questionnaire(entity_component.ContextComponent):
     self._questionnaires: Dict[str, base_questionnaire.QuestionnaireBase] = {
         questionnaire.name: questionnaire for questionnaire in questionnaires
     }
+    self._embedder = embedder
     self._lock = threading.Lock()
 
     # q_id -> (questionnaire_type, question_data)
@@ -125,6 +128,7 @@ class Questionnaire(entity_component.ContextComponent):
     action_str = f'prompt: "{prompt}";;type: {type_str}'
     if options_str:
       action_str += f';;options: {options_str}'
+    print(action_str)
     return action_str
 
   def pre_act(
@@ -189,11 +193,16 @@ class Questionnaire(entity_component.ContextComponent):
       self, player_name: str, question_id: str, answer_text: str
   ):
     questionnaire_name, current_question = self._questions_by_id[question_id]
-    questionnaire = self._questionnaires[questionnaire_name]
 
-    dimension, answer_value = questionnaire.process_answer(
-        player_name, answer_text, current_question
-    )
+    dimension = current_question.dimension
+
+    # Embedd answer and choices, computer their cosine similarity
+    answer_embedding = self._embedder(answer_text)
+    choice_similarities = []
+    for choice in current_question.choices:
+      choice_embedding = self._embedder(choice)
+      similarity = np.dot(answer_embedding, choice_embedding)
+      choice_similarities.append({'choice': choice, 'similarity': similarity})
 
     if player_name not in self._answers:
       self._answers[player_name] = {}
@@ -204,7 +213,8 @@ class Questionnaire(entity_component.ContextComponent):
         'statement': current_question.statement,
         'text': answer_text,
         'dimension': dimension,
-        'value': answer_value,
+        'value': choice_similarities,
+        'embedding': answer_embedding,
     }
 
   def get_answers(self) -> dict[str, dict[str, Any]]:
@@ -239,19 +249,12 @@ class Questionnaire(entity_component.ContextComponent):
     return df
 
   def plot_all_results(
-      self,
-      results_df: pd.DataFrame,
-      label_column: str | None = None,
-      kwargs: Optional[dict[str, Any]] = None,
+      self, results_df: pd.DataFrame, label_column: str | None = None
   ):
     """Calls the plot_results function for each questionnaire."""
-    if kwargs is None:
-      kwargs = {}
     for questionnaire in self._questionnaires.values():
       print(f'Plotting results for {questionnaire.name}')
-      questionnaire.plot_results(
-          results_df, label_column=label_column, kwargs=kwargs
-      )
+      questionnaire.plot_results(results_df, label_column=label_column)
 
   def get_state(self) -> entity_component.ComponentState:
     """Returns the state of the component."""

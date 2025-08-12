@@ -11,10 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Library of components contributed by users."""
-
-from concordia.contrib.components.game_master import death
-from concordia.contrib.components.game_master import industrial_action
-from concordia.contrib.components.game_master import triggered_function
-from concordia.contrib.components.game_master import triggered_inventory_effect
