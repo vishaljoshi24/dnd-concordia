@@ -18,6 +18,7 @@ from concordia.components.agent import action_spec_ignored
 from concordia.components.agent import all_similar_memories
 from concordia.components.agent import concat_act_component
 from concordia.components.agent import constant
+from concordia.components.agent import dnd_instructions
 from concordia.components.agent import instructions
 from concordia.components.agent import memory
 from concordia.components.agent import no_op_context_processor

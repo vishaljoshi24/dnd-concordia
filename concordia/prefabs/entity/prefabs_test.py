@@ -21,11 +21,12 @@ from concordia.associative_memory import basic_associative_memory
 from concordia.language_model import no_language_model
 from concordia.prefabs.entity import basic
 from concordia.prefabs.entity import basic_with_plan
-from concordia.prefabs.entity import fake_assistant_with_configurable_system_prompt
+from concordia.prefabs.entity import dnd_player
+from concordia.prefabs.entity import \
+    fake_assistant_with_configurable_system_prompt
 from concordia.prefabs.entity import minimal
 from concordia.typing import entity as entity_lib
 import numpy as np
-
 
 OPTIONS = ('x', 'y')
 DECISION_ACTION_SPEC = entity_lib.choice_action_spec(
@@ -42,6 +43,7 @@ AGENT_FACTORIES = {
     'fake_assistant_with_configurable_system_prompt': (
         fake_assistant_with_configurable_system_prompt
     ),
+    'dnd_player': dnd_player,
     'minimal': minimal,
 }
 
@@ -58,6 +60,7 @@ class EntityPrefabsTest(parameterized.TestCase):
       dict(testcase_name='basic_with_plan', entity_name='basic_with_plan'),
       dict(testcase_name='fake_assistant_with_configurable_system_prompt',
            entity_name='fake_assistant_with_configurable_system_prompt'),
+      dict(testcase_name='dnd_player', entity_name='dnd_player'),
       dict(testcase_name='minimal', entity_name='minimal'),
   )
   def test_output_in_right_format(self, entity_name: str):
