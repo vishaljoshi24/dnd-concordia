@@ -39,6 +39,9 @@ class Entity(prefab_lib.Prefab):
   params: Mapping[str, str] = dataclasses.field(
       default_factory=lambda: {
           'name': '',
+          'gender': '',
+          'class': '',
+          'level': int,
           'race': '',
           'background': '',
           'alignment': '',
