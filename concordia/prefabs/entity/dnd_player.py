@@ -76,7 +76,25 @@ class Entity(prefab_lib.Prefab):
       An entity.
     """
     entity_name = self.params.get('name', '')
+    entity_gender = self.params.get('gender', '')
+    entity_class = self.params.get('class', '')
+    entity_level = self.params.get('level', int)
+    entity_race = self.params.get('race', '')
+    entity_background = self.params.get('background', '')
+    entity_alignment = self.params.get('alignment', '')
+    entity_equipment = self.params.get('equipment', dict)
+    entity_armour_class = self.params.get('armour_class', int)
+    entity_ability_score = self.params.get('ability_score', dict)
+    entity_ability_modifier = self.params.get('ability_modifier', dict)
+    entity_initiative = self.params.get('initiative', int)
+    entity_speed = self.params.get('speed', int)
+    entity_context = self.params.get('context', '')
+    entity_traits = self.params.get('traits', '')
+    entity_bonds = self.params.get('bonds', '')
+    entity_ideals = self.params.get('ideals', '')
+    entity_flaws = self.params.get('flaws', '')
     entity_goal = self.params.get('goal', '')
+
 
     instructions_key = 'Instructions'
     instructions = agent_components.dnd_instructions.Instructions(
