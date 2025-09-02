@@ -29,11 +29,10 @@ class Instructions(constant.Constant):
   ):
     state = (
         f'The instructions for how to play the role of {agent_name} are as '
-        'follows. This is a social science experiment studying how well you '
-        f'play the role of a character named {agent_name}. The experiment '
-        'is structured as a tabletop roleplaying game (like dungeons and '
-        'dragons). However, in this case it is a serious social science '
-        'experiment and simulation. The goal is to be realistic. It is '
+        'follows. This is a table-top roleplaying game - Dungeons & Dragons where you '
+        f'play the role of a character named {agent_name}. '
+        'However, in this case it is within a simulation'
+        'The goal is to be consistent with the game rules . It is '
         f'important to play the role of a person like {agent_name} as '
         f'accurately as possible, i.e., by responding in ways that you think '
         f'it is likely a person like {agent_name} would respond, and taking '
