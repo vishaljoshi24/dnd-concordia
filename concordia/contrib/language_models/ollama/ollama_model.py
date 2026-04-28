@@ -45,7 +45,7 @@ class OllamaLanguageModel(language_model.LanguageModel):
   def __init__(
       self,
       model_name: str,
-      *,
+      client: str,
       system_message: str = _DEFAULT_SYSTEM_MESSAGE,
       measurements: measurements_lib.Measurements | None = None,
       channel: str = language_model.DEFAULT_STATS_CHANNEL,
@@ -72,7 +72,7 @@ class OllamaLanguageModel(language_model.LanguageModel):
   def sample_text(
       self,
       prompt: str,
-      *,
+      client,
       max_tokens: int = language_model.DEFAULT_MAX_TOKENS,
       terminators: Collection[str] = _DEFAULT_TERMINATORS,
       temperature: float = _DEFAULT_TEMPERATURE,
