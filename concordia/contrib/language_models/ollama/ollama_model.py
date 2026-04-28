@@ -126,7 +126,7 @@ class OllamaLanguageModel(language_model.LanguageModel):
           attempts, _MAX_MULTIPLE_CHOICE_ATTEMPTS
       )
 
-      answer = self._sample.text(
+      answer = self._sample_text(
           model=self._model_name,
           prompt=(
               f'{prompt_with_system_message}.\n'
