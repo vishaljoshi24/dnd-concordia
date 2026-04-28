@@ -111,7 +111,7 @@ class OllamaLanguageModel(language_model.LanguageModel):
   def sample_choice(
       self,
       prompt: str,
-      responses: str,
+      responses: Sequence[str],
       *,
       seed: int | None = None,
   ) -> tuple[int, str, dict[str, float]]:
