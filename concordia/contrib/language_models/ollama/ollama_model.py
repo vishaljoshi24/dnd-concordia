@@ -126,7 +126,7 @@ class OllamaLanguageModel(language_model.LanguageModel):
           attempts, _MAX_MULTIPLE_CHOICE_ATTEMPTS
       )
 
-      answer = self._sample_text(
+      response = self._client.generate(
           model=self._model_name,
           prompt=(
               f'{prompt_with_system_message}.\n'
@@ -137,24 +137,24 @@ class OllamaLanguageModel(language_model.LanguageModel):
           keep_alive='10m',
           seed=seed
       )
-      # try:
-      #   json_data_response = json.loads(response['response'])
-      # except json.JSONDecodeError:
-      #   continue
-      # sample_or_none = json_data_response.get('choice', None)
-      # if sample_or_none is None:
-      #   if isinstance(json_data_response, dict) and json_data_response:
-      #     sample = next(iter(json_data_response.values()))
-      #   elif isinstance(json_data_response, str) and json_data_response:
-      #     sample = sample_or_none.strip()
-      #   else:
-      #     continue
-      # else:
-      #   sample = sample_or_none
-      #   if isinstance(sample, str) and sample:
-      #     sample = sample.strip()
+      try:
+        json_data_response = json.loads(response['response'])
+      except json.JSONDecodeError:
+        continue
+      sample_or_none = json_data_response.get('choice', None)
+      if sample_or_none is None:
+        if isinstance(json_data_response, dict) and json_data_response:
+          sample = next(iter(json_data_response.values()))
+        elif isinstance(json_data_response, str) and json_data_response:
+          sample = sample_or_none.strip()
+        else:
+          continue
+      else:
+        sample = sample_or_none
+        if isinstance(sample, str) and sample:
+          sample = sample.strip()
 
-      # answer = sampling.extract_choice_response(sample)
+      answer = sampling.extract_choice_response(sample)
       try:
         idx = responses.index(answer)
       except ValueError:
