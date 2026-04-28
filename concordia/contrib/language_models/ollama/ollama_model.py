@@ -45,7 +45,7 @@ class OllamaLanguageModel(language_model.LanguageModel):
   def __init__(
       self,
       model_name: str,
-      api_key: str,
+      *,
       system_message: str = _DEFAULT_SYSTEM_MESSAGE,
       measurements: measurements_lib.Measurements | None = None,
       channel: str = language_model.DEFAULT_STATS_CHANNEL,
